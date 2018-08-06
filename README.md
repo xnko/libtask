@@ -18,10 +18,10 @@ A stackful task/coroutine library
 > make build=Debug
 
 # install
-> make install
+> sudo make install
 
 # uninstall
-> make uninstall
+> sudo make uninstall
 ```
 
 ## API Reference

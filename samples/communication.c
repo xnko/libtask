@@ -18,20 +18,20 @@ const char* say_to_bot(const char* message)
 	char *hex = "0123456789abcdef";
 
     // Url encode the `message`
-	while (*c)
+    while (*c)
     {
-		if (isalnum(*c)) { command[i++] = *c; }
+        if (isalnum(*c)) { command[i++] = *c; }
         else
         {
             command[i++] = '%';
             command[i++] = hex[*c >> 4];
             command[i++] = hex[*c >> 15];
-		}
+        }
 
         ++c;
-	}
+    }
 
-    strcat(command, "\" -X POST http://ec2-54-215-197-164.us-west-1.compute.amazonaws.com/ui.php");
+    strcpy(command + i - 3, "\" -X POST http://ec2-54-215-197-164.us-west-1.compute.amazonaws.com/ui.php");
 
     fp = popen(command, "r");
     if (fp)

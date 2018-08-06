@@ -90,60 +90,14 @@
 #   endif
 #endif
 
-
-// Thread Local
-#if PLATFORM_APPLE || PLATFORM_ANDROID
-
-#   if PLATFORM_ANDROID
-typedef int _pthread_key_t;
-#   else
-typedef __darwin_pthread_key_t _pthread_key_t;
-#   endif
-
-extern int pthread_key_create(_pthread_key_t*, void (*)(void*));
-extern int pthread_setspecific(_pthread_key_t, const void*);
-extern void* pthread_getspecific(_pthread_key_t);
-
-#define DECLARE_THREAD_LOCAL(type, name, init) \
-static _pthread_key_t _##name##_key = 0; \
-static FORCEINLINE _pthread_key_t get_##name##_key(void) { if (!_##name##_key) pthread_key_create(&_##name##_key, init); return _##name##_key; } \
-static FORCEINLINE type get_thread_##name(void) { return (type)((uintptr_t)pthread_getspecific(get_##name##_key())); } \
-static FORCEINLINE void set_thread_##name(type val) { pthread_setspecific(get_##name##_key(), (const void*)(uintptr_t)val); }
-
-#elif PLATFORM_WINDOWS && COMPILER_CLANG
-
-__declspec(dllimport) unsigned long __stdcall TlsAlloc();
-__declspec(dllimport) void*__stdcall TlsGetValue(unsigned long);
-__declspec(dllimport) int __stdcall TlsSetValue(unsigned long, void*);
-
-#define DECLARE_THREAD_LOCAL(type, name, init) \
-static unsigned long _##name##_key = 0; \
-static FORCEINLINE unsigned long get_##name##_key(void) { if (!_##name##_key) { _##name##_key = TlsAlloc(); TlsSetValue(_##name##_key, init); } return _##name##_key; } \
-static FORCEINLINE type get_thread_##name(void) { return (type)((uintptr_t)TlsGetValue(get_##name##_key())); } \
-static FORCEINLINE void set_thread_##name(type val) { TlsSetValue(get_##name##_key(), (void*)((uintptr_t)val)); }
-
-#else
-
-#define DECLARE_THREAD_LOCAL(type, name, init) \
-static THREADLOCAL type _thread_##name = init; \
-static FORCEINLINE void set_thread_##name(type val) { _thread_##name = val; } \
-static FORCEINLINE type get_thread_##name(void) { return _thread_##name; }
-
+#if PLATFORM_WINDOWS == 0
+#   include <pthread.h>
 #endif
 
 #include "../include/task.h"
 #include <malloc.h>
 #include "context.h"
 typedef ucontext_t context_t;
-
-#if PLATFORM_WINDOWS && TASK_BUILD_SHARED
-
-BOOL WINAPI DllMain (HINSTANCE hDll, DWORD dwReason, LPVOID lpReserved)
-{
-    return TRUE;
-}
-
-#endif
 
 typedef struct task_t {
     context_t context;
@@ -164,7 +118,62 @@ typedef struct scheduler_t {
     void* value; // last yield value
 } scheduler_t;
 
-DECLARE_THREAD_LOCAL(scheduler_t*, scheduler, 0);
+#if PLATFORM_WINDOWS
+
+static DWORD tlsScheduler = 0;
+
+static scheduler_t* get_thread_scheduler()
+{
+    if (tlsScheduler == 0)
+    {
+        tlsScheduler = TlsAlloc();
+        TlsSetValue(tlsScheduler, 0);
+
+        return 0;
+    }
+
+    return TlsGetValue(tlsScheduler);
+}
+
+static void set_thread_scheduler(scheduler_t* scheduler)
+{
+    if (tlsScheduler == 0)
+    {
+        tlsScheduler = TlsAlloc();
+    }
+
+    return TlsSetValue(tlsScheduler, scheduler);
+}
+
+#else // Not Windows
+#   include <pthread.h>
+static pthread_key_t keyScheduler = -1;
+static void task_scheduler_delete(void* unused);
+
+static scheduler_t* get_thread_scheduler()
+{
+    if (keyScheduler == -1)
+    {
+        pthread_key_create(&keyScheduler, task_scheduler_delete);
+        pthread_setspecific(keyScheduler, 0);
+
+        return 0;
+    }
+
+    return pthread_getspecific(keyScheduler);
+}
+
+static void set_thread_scheduler(scheduler_t* scheduler)
+{
+    if (keyScheduler == -1)
+    {
+        pthread_key_create(&keyScheduler, task_scheduler_delete);
+    }
+
+    pthread_setspecific(keyScheduler, scheduler);
+}
+
+#endif
 
 static uintptr_t task_default_stack_size = 0;
 
@@ -179,8 +188,33 @@ static uintptr_t task_get_default_stack_size()
     return task_default_stack_size;
 }
 
+static void task_scheduler_delete(void* unused)
+{
+    scheduler_t* scheduler = get_thread_scheduler();
+
+    if (scheduler != 0)
+    {
+        set_thread_scheduler(0);
+
+        free(scheduler);
+    }
+}
+
+#if PLATFORM_WINDOWS && !defined(TASK_BUILD_SHARED)
+
+VOID WINAPI FlsCleanupCallback(_In_ PVOID lpFlsData)
+{
+    task_scheduler_delete(0);
+}
+
+#endif
+
+
 static scheduler_t* task_scheduler_ensure()
 {
+#if PLATFORM_WINDOWS && !defined(TASK_BUILD_SHARED)
+    static DWORD flsIndex = 0;
+#endif
     scheduler_t* scheduler = get_thread_scheduler();
 
     if (scheduler == 0)
@@ -193,14 +227,35 @@ static scheduler_t* task_scheduler_ensure()
         scheduler->prev = 0;
 
         set_thread_scheduler(scheduler);
+
+        // On Windows shared build, cleanup in DllMain's DLL_THREAD_DETACH case
+        // On Windows static build, cleanup using FlsAlloc(cleanup_callback)
+        // On others, cleanup using pthread_key_create's destructor
+#if PLATFORM_WINDOWS && !defined(TASK_BUILD_SHARED)
+        if (flsIndex == 0)
+        {
+            flsIndex = FlsAlloc(FlsCleanupCallback);
+        }
+#endif
     }
 
     return scheduler;
 }
 
-// ToDo:
-//  on windows delete scheduler when last task completes 
-//  on others delete scheduler on thread exit callback
+#if PLATFORM_WINDOWS && TASK_BUILD_SHARED
+
+BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, LPVOID lpReserved)
+{
+    switch (dwReason) {
+    case DLL_THREAD_DETACH:
+        task_scheduler_delete(0);
+        break;
+    }
+
+    return TRUE;
+}
+
+#endif
 
 static void task_entry_point(struct task_t* task)
 {

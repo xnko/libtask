@@ -44,6 +44,9 @@ set_target_properties(task PROPERTIES COMPILE_DEFINITIONS "TASK_BUILD_SHARED=1")
 if(UNIX AND NOT APPLE)
     target_link_libraries(task rt)
 endif(UNIX AND NOT APPLE)
+if(UNIX)
+    target_link_libraries(task pthread)
+endif(UNIX)
 
 install(TARGETS task DESTINATION bin
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
