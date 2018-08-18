@@ -6,7 +6,7 @@ A stackful task/coroutine library
 - Zero configuration
 - Zero setup
 - Blazing fast
-- Memory efficient (with autogrow stacks)
+- Memory efficient (with autogrow stacks on linux)
 
 ## CLI
 
@@ -198,7 +198,7 @@ void main()
 ## Platforms
 
 Tested on
-- Win64 (32 bit build)
+- Win64 (32/64 bit build)
 - Ubuntu64 (64 bit build)
 
 ## ToDos
