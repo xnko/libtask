@@ -1,39 +1,56 @@
 IFDEF RAX
 
-getcontext PROTO STDCALL :QWORD
-setcontext PROTO STDCALL :QWORD
-
-; ToDo: replace magic numbers with CONTEXT structure field offset calculations
-offset_rip equ 248
-offset_rsp equ 152
+fix_and_swapcontext PROTO STDCALL :QWORD
 
 .code
 
-; On ARM and x64 processors, __stdcall is accepted and ignored by the compiler
-; On ARM and x64 architectures, by convention, arguments are passed in registers when possible
+swapcontext PROC
 
-swapcontext_ PROC
-	push rax ; save to
-	push rcx ; save from
+	push r8
+	push r9
+	push rdi
+	push rsi
+	push rbp
+	push rdx ; other
+	push rcx ; current
 
-	mov rax, rcx
-	call getcontext	; get from's context
+	lea r8, gotback
+	mov r9, rsp
 
-	; correct rip
-	pop rcx	; from
-	lea rax, done
-	mov [rcx + offset_rip], rax
+	; without some stack padding someone overrides our values, no idea why?
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
+	push rax
 
-	pop rax ; to
+	call fix_and_swapcontext
 
-	; correct rsp
-	mov [rcx + offset_rsp], rsp
+gotback:
 
-	mov rcx, rax ; to
-	call setcontext
-done:
+	pop rcx
+	pop rdx
+	pop rbp
+	pop rsi
+	pop rdi
+	pop r9
+	pop r8
 	ret
-swapcontext_ ENDP
+
+swapcontext ENDP
 
 ENDIF
 
