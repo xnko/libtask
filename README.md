@@ -5,7 +5,7 @@ A stackful task/coroutine library
 - Cross platform
 - Zero configuration
 - Zero setup
-- Bleazing fast
+- Blazing fast
 - Memory efficient (with autogrow stacks)
 
 ## CLI

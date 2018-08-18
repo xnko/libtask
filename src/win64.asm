@@ -4,32 +4,36 @@ getcontext PROTO STDCALL :QWORD
 setcontext PROTO STDCALL :QWORD
 
 ; ToDo: replace magic numbers with CONTEXT structure field offset calculations
-offset_rip equ 252
-offset_rsp equ 156
+offset_rip equ 248
+offset_rsp equ 152
 
 .code
 
-swapcontext PROC
-	push [rsp + 8]
-	call getcontext
+; On ARM and x64 processors, __stdcall is accepted and ignored by the compiler
+; On ARM and x64 architectures, by convention, arguments are passed in registers when possible
+
+swapcontext_ PROC
+	push rax ; save to
+	push rcx ; save from
+
+	mov rax, rcx
+	call getcontext	; get from's context
 
 	; correct rip
-	lea rax, [rsp + 8]
-	add rax, offset_rip
-	lea rdx, done
-	mov [rax], rdx
+	pop rcx	; from
+	lea rax, done
+	mov [rcx + offset_rip], rax
+
+	pop rax ; to
 
 	; correct rsp
-	lea rax, [rsp + 8]
-	add rax, offset_rsp
-	mov [rax], rsp
+	mov [rcx + offset_rsp], rsp
 
-	push [rsp + 16]
+	mov rcx, rax ; to
 	call setcontext
 done:
-	add rsp, 16
 	ret
-swapcontext ENDP
+swapcontext_ ENDP
 
 ENDIF
 

@@ -20,63 +20,70 @@
  */
 
 #include <Windows.h>
+#include <stdint.h>
+#include <intrin.h>
 
 #define mcontext_t CONTEXT
 
 typedef struct ucontext_t {
     mcontext_t uc;
     char* stack;
-    size_t  stack_size;
+    size_t stack_size;
 } ucontext_t;
 
-__declspec(noinline) int __stdcall getcontext(ucontext_t* ctx)
+__declspec(noinline) void __stdcall getcontext(ucontext_t* ctx)
 {
     RtlCaptureContext(&ctx->uc);
-    return 0;
 }
 
-__declspec(noinline) void __stdcall setcontext(ucontext_t* ctx)
+__declspec(noinline) void __stdcall setcontext(const ucontext_t* ctx)
 {
+#if defined (_WIN64)
+	RtlRestoreContext((PCONTEXT)&ctx->uc, 0);
+#else
     SetThreadContext(GetCurrentThread(), &ctx->uc);
+#endif
 }
 
 void makecontext(ucontext_t* ctx, void(*callback)(), int argc, ...)
 {
-    va_list arguments;
     size_t* sp = (size_t*)(ctx->stack + ctx->stack_size);
-    int n;
-
-    va_start(arguments, argc);
-
-    for (n = 0; n < argc; ++n)
-    {
-        *(sp - n - 1) = va_arg(arguments, size_t);
-    }
-
-    va_end(arguments);
+	//sp = (size_t*)((uintptr_t)sp & (~15));
+	//*(sp - 1) = task;
 
 #if defined (_WIN64)
     ctx->uc.Rip = (size_t)callback;
-    ctx->uc.Rsp = (size_t)(sp - argc - 1);
+    ctx->uc.Rsp = (size_t)(sp - 1);
 #else
     ctx->uc.Eip = (size_t)callback;
-    ctx->uc.Esp = (size_t)(sp - argc - 1);
+    ctx->uc.Esp = (size_t)(sp - 1);
 #endif
 }
 
 #if defined (_WIN64)
 
-// const int offset_eip = (int)(&((CONTEXT*)0)->Rip);
-// const int offset_esp = (int)(&((CONTEXT*)0)->Rsp);
+__declspec(noinline) void __stdcall fix_and_swapcontext(
+	ucontext_t* from,
+	ucontext_t* to,
+	DWORD64 ip,
+	DWORD64 sp)
+{
+	getcontext(from);
 
-extern int __stdcall swapcontext(ucontext_t*, const ucontext_t*);
+	from->uc.Rip = ip;
+	from->uc.Rsp = sp;
+
+	setcontext(to);
+}
+
+extern void __stdcall swapcontext(ucontext_t* from, const ucontext_t* to);
 
 #else
 
 const int offset_eip = (int)(&((CONTEXT*)0)->Eip);
 const int offset_esp = (int)(&((CONTEXT*)0)->Esp);
 
-int __stdcall swapcontext(ucontext_t* oucp, ucontext_t* ucp)
+void __stdcall swapcontext(ucontext_t* oucp, ucontext_t* ucp)
 {
     __asm {
 

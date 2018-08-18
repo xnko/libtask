@@ -1,0 +1,50 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="include">
+      <UniqueIdentifier>{552e0d3e-4af9-4b9f-a37f-fcacc52b2cba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\task.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\386-ucontext.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\amd64-ucontext.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\context.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mips-ucontext.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\power-ucontext.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\win-ucontext.h">
+      <Filter>src</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\asm.s">
+      <Filter>src</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\task.c">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="win64.asm">
+      <Filter>src</Filter>
+    </MASM>
+  </ItemGroup>
+</Project>

@@ -142,7 +142,7 @@ static void set_thread_scheduler(scheduler_t* scheduler)
         tlsScheduler = TlsAlloc();
     }
 
-    return TlsSetValue(tlsScheduler, scheduler);
+    TlsSetValue(tlsScheduler, scheduler);
 }
 
 #else // Not Windows
@@ -209,7 +209,6 @@ VOID WINAPI FlsCleanupCallback(_In_ PVOID lpFlsData)
 
 #endif
 
-
 static scheduler_t* task_scheduler_ensure()
 {
 #if PLATFORM_WINDOWS && !defined(TASK_BUILD_SHARED)
@@ -257,9 +256,10 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, LPVOID lpReserved)
 
 #endif
 
-static void task_entry_point(struct task_t* task)
+static void task_entry_point()
 {
     scheduler_t* scheduler = task_scheduler_ensure();
+	task_t* task = scheduler->current;
 
     task->entry(task, task->arg);
     task->is_done = 1;
@@ -285,7 +285,7 @@ void task_swapcontext(struct task_t* current, struct task_t* other)
 
     scheduler->prev = current;
     scheduler->current = other;
-    swapcontext(&current->context, &other->context);
+	swapcontext(&current->context, &other->context);
     scheduler->current = current;
 
     if (scheduler->prev != 0 &&
@@ -348,13 +348,17 @@ static void* task_create_stack(size_t size)
     size_t init_commit_size = page_size + page_size;
     char* pPtr = ((char*)vp) + size;
     pPtr -= init_commit_size;
-    if (!VirtualAlloc(pPtr, init_commit_size, MEM_COMMIT, PAGE_READWRITE))
-        goto cleanup;
+	if (!VirtualAlloc(pPtr, init_commit_size, MEM_COMMIT, PAGE_READWRITE))
+	{
+		goto cleanup;
+	}
 
     // create guard page so the OS can catch page faults and grow our stack
     pPtr -= page_size;
-    if (VirtualAlloc(pPtr, page_size, MEM_COMMIT, PAGE_READWRITE|PAGE_GUARD))
-        return vp;
+	if (VirtualAlloc(pPtr, page_size, MEM_COMMIT, PAGE_READWRITE | PAGE_GUARD))
+	{
+		return vp;
+	}
 
 cleanup:
 
