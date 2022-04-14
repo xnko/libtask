@@ -412,6 +412,8 @@ static void* task_create_stack(size_t size)
     {
         return 0;
     }
+	
+	return vp;
 }
 
 static void task_delete_stack(void* stack, size_t size)
